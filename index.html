@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Let Me Grok It For You</title>
     <script src="https://cdn.jsdelivr.net/npm/typed.js@2.0.12"></script>
+    <script src="https://unpkg.com/compromise@latest/builds/compromise.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -44,7 +45,7 @@
             word-wrap: break-word;
             color: #007bff;
         }
-        #message {
+        #message, #enhanced-query {
             margin-top: 20px;
             font-size: 18px;
             color: #666;
@@ -60,12 +61,73 @@
     </div>
     <div id="animation" style="display: none;">
         <p id="message"></p>
+        <p id="enhanced-query"></p>
         <div class="search-bar">
             <input type="text" id="typed-query" disabled>
             <button id="search-btn">Grok Search</button>
         </div>
     </div>
     <script>
+        function enhanceQuery(query) {
+            const doc = nlp(query);
+            let keywords = [];
+            let baseTerms = [];
+
+            // Extract key terms (nouns, topics)
+            const nouns = doc.nouns().out('array');
+            if (nouns.length > 0) {
+                baseTerms = nouns;
+            } else {
+                baseTerms = [query.trim()];
+            }
+
+            // Check for question type
+            const questionWords = ['what', 'how', 'why', 'when', 'where', 'who'];
+            const firstWord = doc.out('text').split(' ')[0].toLowerCase();
+            if (questionWords.includes(firstWord)) {
+                switch (firstWord) {
+                    case 'what':
+                        keywords = ['definition', 'process', 'examples', 'importance'];
+                        break;
+                    case 'how':
+                        keywords = ['steps', 'guide', 'tutorial', 'tips'];
+                        break;
+                    case 'why':
+                        keywords = ['reason', 'cause', 'effect', 'explanation'];
+                        break;
+                    case 'when':
+                        keywords = ['date', 'time', 'history', 'timeline'];
+                        break;
+                    case 'where':
+                        keywords = ['location', 'map', 'geography', 'places'];
+                        break;
+                    case 'who':
+                        keywords = ['biography', 'profile', 'achievements', 'facts'];
+                        break;
+                }
+            } else {
+                // Check for named entities or general terms
+                const people = doc.people().out('array');
+                const places = doc.places().out('array');
+                if (people.length > 0) {
+                    keywords = ['biography', 'quotes', 'news', 'achievements'];
+                } else if (places.length > 0) {
+                    keywords = ['map', 'weather', 'history', 'attractions'];
+                } else {
+                    keywords = ['information', 'details', 'overview', 'examples'];
+                }
+            }
+
+            // Construct enhanced query using a "tree-like" expansion
+            let enhancedParts = [query.trim()];
+            keywords.forEach(keyword => {
+                enhancedParts.push(`${baseTerms.join(' ')} ${keyword}`);
+            });
+
+            // Join with OR operators to broaden the search (if supported by Grok)
+            return enhancedParts.join(' OR ');
+        }
+
         const params = new URLSearchParams(window.location.search);
         const query = params.get('q');
         if (query) {
@@ -75,10 +137,15 @@
                 strings: [query],
                 typeSpeed: 50,
                 onComplete: function() {
-                    document.getElementById('message').innerText = "Now redirecting to Grok's search results...";
+                    document.getElementById('message').innerText = "Enhancing your query with tree search...";
                     setTimeout(() => {
-                        window.location.href = `https://grok.com/search?q=${encodeURIComponent(query)}`;
-                    }, 2000);
+                        const enhancedQuery = enhanceQuery(query);
+                        document.getElementById('enhanced-query').innerText = "Enhanced query: " + enhancedQuery;
+                        document.getElementById('message').innerText = "Now redirecting to Grok's search results...";
+                        setTimeout(() => {
+                            window.location.href = `https://grok.com/search?q=${encodeURIComponent(enhancedQuery)}`;
+                        }, 2000);
+                    }, 1000);
                 }
             });
         } else {
@@ -95,4 +162,3 @@
     </script>
 </body>
 </html>
-
